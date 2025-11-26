@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { Sparkles, Search, ArrowUp } from 'lucide-react';
 import Stage1 from './Stage1';
 import Stage2 from './Stage2';
 import Stage3 from './Stage3';
@@ -12,6 +13,7 @@ export default function ChatInterface({
 }) {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -21,16 +23,37 @@ export default function ChatInterface({
     scrollToBottom();
   }, [conversation]);
 
+  const adjustTextareaHeight = () => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.style.height = '24px';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    }
+  };
+
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    adjustTextareaHeight();
+  };
+
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [input]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
       onSendMessage(input);
       setInput('');
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = '24px';
+        }
+      }, 0);
     }
   };
 
   const handleKeyDown = (e) => {
-    // Submit on Enter (without Shift)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -40,9 +63,40 @@ export default function ChatInterface({
   if (!conversation) {
     return (
       <div className="chat-interface">
-        <div className="empty-state">
-          <h2>Welcome to LLM Council</h2>
-          <p>Create a new conversation to get started</p>
+        <div className="messages-container">
+          <div className="empty-state">
+            <div className="empty-state-header">
+              <div className="empty-state-logo">
+                <Sparkles />
+                LLM Council
+              </div>
+            </div>
+            <div className="input-form-wrapper">
+              <form className="input-form" onSubmit={handleSubmit}>
+                <div className="input-icon">
+                  <Search size={20} />
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  className="message-input"
+                  placeholder="What do you want to know?"
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading}
+                  rows={1}
+                />
+                <button
+                  type="submit"
+                  className="send-button"
+                  disabled={!input.trim() || isLoading}
+                  aria-label="Send message"
+                >
+                  <ArrowUp size={18} />
+                </button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -53,8 +107,37 @@ export default function ChatInterface({
       <div className="messages-container">
         {conversation.messages.length === 0 ? (
           <div className="empty-state">
-            <h2>Start a conversation</h2>
-            <p>Ask a question to consult the LLM Council</p>
+            <div className="empty-state-header">
+              <div className="empty-state-logo">
+                <Sparkles />
+                LLM Council
+              </div>
+            </div>
+            <div className="input-form-wrapper">
+              <form className="input-form" onSubmit={handleSubmit}>
+                <div className="input-icon">
+                  <Search size={20} />
+                </div>
+                <textarea
+                  ref={textareaRef}
+                  className="message-input"
+                  placeholder="What do you want to know?"
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleKeyDown}
+                  disabled={isLoading}
+                  rows={1}
+                />
+                <button
+                  type="submit"
+                  className="send-button"
+                  disabled={!input.trim() || isLoading}
+                  aria-label="Send message"
+                >
+                  <ArrowUp size={18} />
+                </button>
+              </form>
+            </div>
           </div>
         ) : (
           conversation.messages.map((msg, index) => (
@@ -120,25 +203,32 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {conversation.messages.length === 0 && (
-        <form className="input-form" onSubmit={handleSubmit}>
-          <textarea
-            className="message-input"
-            placeholder="Ask your question... (Shift+Enter for new line, Enter to send)"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={isLoading}
-            rows={3}
-          />
-          <button
-            type="submit"
-            className="send-button"
-            disabled={!input.trim() || isLoading}
-          >
-            Send
-          </button>
-        </form>
+      {conversation.messages.length > 0 && (
+        <div className="input-form-wrapper">
+          <form className="input-form" onSubmit={handleSubmit}>
+            <div className="input-icon">
+              <Search size={20} />
+            </div>
+            <textarea
+              ref={textareaRef}
+              className="message-input"
+              placeholder="Ask a follow-up question..."
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              disabled={isLoading}
+              rows={1}
+            />
+            <button
+              type="submit"
+              className="send-button"
+              disabled={!input.trim() || isLoading}
+              aria-label="Send message"
+            >
+              <ArrowUp size={18} />
+            </button>
+          </form>
+        </div>
       )}
     </div>
   );
