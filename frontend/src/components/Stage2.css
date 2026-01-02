@@ -1,12 +1,15 @@
 .stage2 {
-  background: #0d0d0d;
+  background: transparent;
+  padding: 16px 0 0 0;
 }
 
 .stage2 h4 {
-  margin: 20px 0 8px 0;
-  color: #ffffff;
-  font-size: 14px;
+  margin: 16px 0 8px 0;
+  color: #808080;
+  font-size: 13px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .stage2 h4:first-of-type {

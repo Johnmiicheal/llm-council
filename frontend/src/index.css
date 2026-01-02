@@ -103,3 +103,59 @@ body {
   border-left: 4px solid #404040;
   color: #a0a0a0;
 }
+
+/* Table styles */
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+  display: block;
+}
+
+.markdown-content table thead {
+  background: #2a2a2a;
+}
+
+.markdown-content table th,
+.markdown-content table td {
+  border: 1px solid #404040;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.markdown-content table th {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.markdown-content table td {
+  color: #e5e5e5;
+}
+
+.markdown-content table tr:hover {
+  background: #1a1a1a;
+}
+
+/* Strikethrough */
+.markdown-content del {
+  color: #808080;
+  text-decoration: line-through;
+}
+
+/* Task lists */
+.markdown-content input[type="checkbox"] {
+  margin-right: 8px;
+  cursor: pointer;
+}
+
+.markdown-content li input[type="checkbox"] {
+  margin-right: 8px;
+}
+
+/* Horizontal rule */
+.markdown-content hr {
+  border: none;
+  border-top: 1px solid #404040;
+  margin: 24px 0;
+}

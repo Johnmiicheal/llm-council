@@ -295,7 +295,7 @@ Title:"""
 
 async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     """
-    Run the complete 3-stage council process.
+    Run the complete 3-stage council process (Thinking Mode).
 
     Args:
         user_query: The user's question
@@ -333,3 +333,296 @@ async def run_full_council(user_query: str) -> Tuple[List, List, Dict, Dict]:
     }
 
     return stage1_results, stage2_results, stage3_result, metadata
+
+
+async def wingman_stage1_collect_suggestions(
+    user_query: str,
+    user_profile: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """
+    Wingman Mode Stage 1: Each model provides 5 suggestions as a wingman.
+
+    Args:
+        user_query: The user's question/situation
+        user_profile: Dict containing gender, race, age, context, etc.
+
+    Returns:
+        List of dicts with 'model' and 'suggestions' keys
+    """
+    profile_items = [
+        f"- {key.replace('_', ' ').title()}: {value}"
+        for key, value in (user_profile or {}).items()
+        if value
+    ]
+    profile_section = "\n".join(profile_items) if profile_items else "(No specific profile provided - give general advice)"
+
+    wingman_prompt = f"""You are the ultimate wingman - charming, socially intelligent, and attuned to interpersonal dynamics. Your job is to help your friend navigate a social or romantic situation.
+
+USER PROFILE:
+{profile_section}
+
+SITUATION:
+{user_query}
+
+Your task:
+Provide exactly 5 distinct suggestions to help your friend. Each suggestion should be:
+- Practical and actionable
+- Culturally aware and respectful
+- Confident but not arrogant
+- Authentic
+
+Format your response EXACTLY like this:
+SUGGESTION 1: [Your first suggestion with a brief explanation]
+SUGGESTION 2: [Your second suggestion with a brief explanation]
+SUGGESTION 3: [Your third suggestion with a brief explanation]
+SUGGESTION 4: [Your fourth suggestion with a brief explanation]
+SUGGESTION 5: [Your fifth suggestion with a brief explanation]
+
+Be creative, be bold, and most importantly - be a great wingman."""
+
+    messages = [{"role": "user", "content": wingman_prompt}]
+
+    responses = await query_models_parallel(COUNCIL_MODELS, messages)
+
+    stage1_results = []
+    for model, response in responses.items():
+        if response is not None:
+            content = response.get('content', '')
+            suggestions = parse_wingman_suggestions(content)
+            stage1_results.append({
+                "model": model,
+                "response": content,
+                "suggestions": suggestions
+            })
+
+    return stage1_results
+
+
+def parse_wingman_suggestions(text: str) -> List[str]:
+    """
+    Parse the 5 suggestions from a wingman model response.
+
+    Args:
+        text: The full response text
+
+    Returns:
+        List of suggestion strings
+    """
+    import re
+
+    suggestions = []
+    pattern = r'SUGGESTION\s*\d+:\s*(.+?)(?=SUGGESTION\s*\d+:|$)'
+    matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+
+    for match in matches:
+        suggestion = match.strip()
+        if suggestion:
+            suggestions.append(suggestion)
+
+    if not suggestions:
+        lines = text.strip().split('\n')
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 20:
+                numbered = re.match(r'^\d+[\.\)]\s*(.+)', line)
+                if numbered:
+                    suggestions.append(numbered.group(1))
+                elif len(suggestions) < 5:
+                    suggestions.append(line)
+
+    return suggestions[:5]
+
+
+async def wingman_stage2_aggregate(
+    user_query: str,
+    user_profile: Dict[str, Any],
+    stage1_results: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Wingman Mode Stage 2: Chairman aggregates all suggestions and selects top 5.
+
+    Args:
+        user_query: The original situation
+        user_profile: User's profile information
+        stage1_results: All suggestions from Stage 1
+
+    Returns:
+        Dict with chairman's top 5 curated suggestions
+    """
+    profile_items = [
+        f"- {key.replace('_', ' ').title()}: {value}"
+        for key, value in (user_profile or {}).items()
+        if value
+    ]
+    profile_section = "\n".join(profile_items) if profile_items else "(General advice requested)"
+
+    all_suggestions = []
+    for result in stage1_results:
+        model_name = result['model'].split('/')[-1]
+        suggestions = result.get('suggestions', [])
+        if suggestions:
+            for suggestion in suggestions:
+                all_suggestions.append(f"[From {model_name}]: {suggestion}")
+        else:
+            response_text = result.get('response', '')
+            if response_text:
+                all_suggestions.append(f"[From {model_name}]: {response_text[:500]}")
+
+    if not all_suggestions:
+        return {
+            "model": CHAIRMAN_MODEL,
+            "response": "No suggestions were collected from the council. Please try again.",
+            "top_5": []
+        }
+
+    suggestions_text = "\n\n".join(all_suggestions)
+
+    chairman_prompt = f"""You are the Head Wingman - the most experienced and socially astute member of the wingman council. Multiple AI wingmen have provided suggestions for your friend.
+
+USER PROFILE:
+{profile_section}
+
+SITUATION:
+{user_query}
+
+ALL SUGGESTIONS FROM THE COUNCIL ({len(all_suggestions)} total):
+{suggestions_text}
+
+Your task:
+Review all the suggestions above and create the TOP 5 recommendations that would work best for this situation. You can adapt, combine, or improve upon the suggestions.
+
+Provide your response in a clear, friendly format:
+
+**TOP 5 WINGMAN RECOMMENDATIONS:**
+
+**1.** [First recommendation]
+*Why this works:* [Brief explanation]
+
+**2.** [Second recommendation]  
+*Why this works:* [Brief explanation]
+
+**3.** [Third recommendation]
+*Why this works:* [Brief explanation]
+
+**4.** [Fourth recommendation]
+*Why this works:* [Brief explanation]
+
+**5.** [Fifth recommendation]
+*Why this works:* [Brief explanation]
+
+**BONUS TIP:** [One overall piece of advice for their situation]
+
+Be encouraging and helpful!"""
+
+    messages = [{"role": "user", "content": chairman_prompt}]
+
+    response = await query_model(CHAIRMAN_MODEL, messages)
+
+    if response is None:
+        return {
+            "model": CHAIRMAN_MODEL,
+            "response": "Error: Unable to aggregate suggestions. Please try again.",
+            "top_5": []
+        }
+
+    content = response.get('content', '')
+    
+    if not content:
+        return {
+            "model": CHAIRMAN_MODEL,
+            "response": "The chairman did not provide a response. Please try again.",
+            "top_5": []
+        }
+
+    top_5 = parse_top_5_recommendations(content)
+
+    return {
+        "model": CHAIRMAN_MODEL,
+        "response": content,
+        "top_5": top_5
+    }
+
+
+def parse_top_5_recommendations(text: str) -> List[Dict[str, str]]:
+    """
+    Parse the top 5 recommendations from chairman's response.
+
+    Args:
+        text: The full response text
+
+    Returns:
+        List of dicts with 'recommendation' and 'reason' keys
+    """
+    import re
+
+    recommendations = []
+    
+    patterns = [
+        r'\*\*(\d+)\.\*\*\s*(.+?)\s*\*Why this works:\*\s*(.+?)(?=\*\*\d+\.|BONUS|\*\*BONUS|$)',
+        r'(\d+)\.\s*\*\*(.+?)\*\*\s*(?:\n|.)*?(?:Why[:\s]|WHY[:\s])(.+?)(?=\d+\.|BONUS|$)',
+        r'(\d+)\.\s*(.+?)(?:WHY:|Why:|Why this works:)\s*(.+?)(?=\d+\.|BONUS|$)',
+        r'\*\*(\d+)\.\*\*\s*(.+?)(?=\*\*\d+\.|$)',
+    ]
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, text, re.DOTALL | re.IGNORECASE)
+        if matches:
+            for match in matches:
+                if len(match) >= 3:
+                    rec = match[1].strip().strip('*').strip()
+                    reason = match[2].strip().strip('*').strip()
+                    if rec and reason:
+                        recommendations.append({
+                            "recommendation": rec,
+                            "reason": reason
+                        })
+                elif len(match) >= 2:
+                    rec = match[1].strip().strip('*').strip()
+                    if rec:
+                        recommendations.append({
+                            "recommendation": rec,
+                            "reason": ""
+                        })
+            if recommendations:
+                break
+
+    return recommendations[:5]
+
+
+async def run_wingman_council(
+    user_query: str,
+    user_profile: Dict[str, Any]
+) -> Tuple[List, Dict, Dict]:
+    """
+    Run the Wingman Mode council process.
+
+    Args:
+        user_query: The user's situation
+        user_profile: Dict with gender, race, age, context, etc.
+
+    Returns:
+        Tuple of (stage1_results, stage2_result, metadata)
+    """
+    stage1_results = await wingman_stage1_collect_suggestions(user_query, user_profile)
+
+    if not stage1_results:
+        return [], {
+            "model": "error",
+            "response": "All models failed to respond. Please try again.",
+            "top_5": []
+        }, {}
+
+    stage2_result = await wingman_stage2_aggregate(
+        user_query,
+        user_profile,
+        stage1_results
+    )
+
+    total_suggestions = sum(len(r.get('suggestions', [])) for r in stage1_results)
+    metadata = {
+        "total_suggestions_collected": total_suggestions,
+        "models_responded": len(stage1_results),
+        "user_profile": user_profile
+    }
+
+    return stage1_results, stage2_result, metadata

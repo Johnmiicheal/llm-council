@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import ChatInterface from './components/ChatInterface';
-import { api } from './api';
+import { api, COUNCIL_MODES } from './api';
 import './App.css';
 
 function App() {
@@ -9,18 +9,7 @@ function App() {
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [currentConversation, setCurrentConversation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  // Load conversations on mount
-  useEffect(() => {
-    loadConversations();
-  }, []);
-
-  // Load conversation details when selected
-  useEffect(() => {
-    if (currentConversationId) {
-      loadConversation(currentConversationId);
-    }
-  }, [currentConversationId]);
+  const [mode, setMode] = useState(COUNCIL_MODES.THINKING);
 
   const loadConversations = async () => {
     try {
@@ -31,14 +20,28 @@ function App() {
     }
   };
 
-  const loadConversation = async (id) => {
-    try {
-      const conv = await api.getConversation(id);
-      setCurrentConversation(conv);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-    }
-  };
+  // Load conversations on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      await loadConversations();
+    };
+    fetchData();
+  }, []);
+
+  // Load conversation details when selected
+  useEffect(() => {
+    if (!currentConversationId) return;
+    
+    const fetchConversation = async () => {
+      try {
+        const conv = await api.getConversation(currentConversationId);
+        setCurrentConversation(conv);
+      } catch (error) {
+        console.error('Failed to load conversation:', error);
+      }
+    };
+    fetchConversation();
+  }, [currentConversationId]);
 
   const handleNewConversation = async () => {
     try {
@@ -57,24 +60,25 @@ function App() {
     setCurrentConversationId(id);
   };
 
-  const handleSendMessage = async (content) => {
+  const handleSendMessage = async (content, messageMode) => {
     if (!currentConversationId) return;
 
+    const currentMode = messageMode || mode;
     setIsLoading(true);
+
     try {
-      // Optimistically add user message to UI
       const userMessage = { role: 'user', content };
       setCurrentConversation((prev) => ({
         ...prev,
         messages: [...prev.messages, userMessage],
       }));
 
-      // Create a partial assistant message that will be updated progressively
       const assistantMessage = {
         role: 'assistant',
+        mode: currentMode,
         stage1: null,
         stage2: null,
-        stage3: null,
+        stage3: currentMode === COUNCIL_MODES.THINKING ? null : undefined,
         metadata: null,
         loading: {
           stage1: false,
@@ -83,20 +87,19 @@ function App() {
         },
       };
 
-      // Add the partial assistant message
       setCurrentConversation((prev) => ({
         ...prev,
         messages: [...prev.messages, assistantMessage],
       }));
 
-      // Send message with streaming
-      await api.sendMessageStream(currentConversationId, content, (eventType, event) => {
+      await api.sendMessageStream(currentConversationId, content, currentMode, null, (eventType, event) => {
         switch (eventType) {
           case 'stage1_start':
             setCurrentConversation((prev) => {
               const messages = [...prev.messages];
               const lastMsg = messages[messages.length - 1];
               lastMsg.loading.stage1 = true;
+              lastMsg.mode = event.mode || currentMode;
               return { ...prev, messages };
             });
             break;
@@ -151,12 +154,10 @@ function App() {
             break;
 
           case 'title_complete':
-            // Reload conversations to get updated title
             loadConversations();
             break;
 
           case 'complete':
-            // Stream complete, reload conversations list
             loadConversations();
             setIsLoading(false);
             break;
@@ -172,7 +173,6 @@ function App() {
       });
     } catch (error) {
       console.error('Failed to send message:', error);
-      // Remove optimistic messages on error
       setCurrentConversation((prev) => ({
         ...prev,
         messages: prev.messages.slice(0, -2),
@@ -193,6 +193,8 @@ function App() {
         conversation={currentConversation}
         onSendMessage={handleSendMessage}
         isLoading={isLoading}
+        mode={mode}
+        onModeChange={setMode}
       />
     </div>
   );

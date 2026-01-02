@@ -18,12 +18,13 @@ def get_conversation_path(conversation_id: str) -> str:
     return os.path.join(DATA_DIR, f"{conversation_id}.json")
 
 
-def create_conversation(conversation_id: str) -> Dict[str, Any]:
+def create_conversation(conversation_id: str, mode: str = "thinking") -> Dict[str, Any]:
     """
     Create a new conversation.
 
     Args:
         conversation_id: Unique identifier for the conversation
+        mode: Council mode - "thinking" or "wingman"
 
     Returns:
         New conversation dict
@@ -34,10 +35,10 @@ def create_conversation(conversation_id: str) -> Dict[str, Any]:
         "id": conversation_id,
         "created_at": datetime.utcnow().isoformat(),
         "title": "New Conversation",
+        "mode": mode,
         "messages": []
     }
 
-    # Save to file
     path = get_conversation_path(conversation_id)
     with open(path, 'w') as f:
         json.dump(conversation, f, indent=2)
@@ -93,15 +94,14 @@ def list_conversations() -> List[Dict[str, Any]]:
             path = os.path.join(DATA_DIR, filename)
             with open(path, 'r') as f:
                 data = json.load(f)
-                # Return metadata only
                 conversations.append({
                     "id": data["id"],
                     "created_at": data["created_at"],
                     "title": data.get("title", "New Conversation"),
+                    "mode": data.get("mode", "thinking"),
                     "message_count": len(data["messages"])
                 })
 
-    # Sort by creation time, newest first
     conversations.sort(key=lambda x: x["created_at"], reverse=True)
 
     return conversations
@@ -169,4 +169,31 @@ def update_conversation_title(conversation_id: str, title: str):
         raise ValueError(f"Conversation {conversation_id} not found")
 
     conversation["title"] = title
+    save_conversation(conversation)
+
+
+def add_wingman_message(
+    conversation_id: str,
+    stage1: List[Dict[str, Any]],
+    stage2: Dict[str, Any]
+):
+    """
+    Add a wingman mode assistant message to a conversation.
+
+    Args:
+        conversation_id: Conversation identifier
+        stage1: List of model suggestions
+        stage2: Chairman's top 5 aggregated recommendations
+    """
+    conversation = get_conversation(conversation_id)
+    if conversation is None:
+        raise ValueError(f"Conversation {conversation_id} not found")
+
+    conversation["messages"].append({
+        "role": "assistant",
+        "mode": "wingman",
+        "stage1": stage1,
+        "stage2": stage2
+    })
+
     save_conversation(conversation)

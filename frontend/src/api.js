@@ -4,10 +4,12 @@
 
 const API_BASE = 'http://localhost:8001';
 
+export const COUNCIL_MODES = {
+  THINKING: 'thinking',
+  WINGMAN: 'wingman',
+};
+
 export const api = {
-  /**
-   * List all conversations.
-   */
   async listConversations() {
     const response = await fetch(`${API_BASE}/api/conversations`);
     if (!response.ok) {
@@ -16,16 +18,13 @@ export const api = {
     return response.json();
   },
 
-  /**
-   * Create a new conversation.
-   */
-  async createConversation() {
+  async createConversation(mode = COUNCIL_MODES.THINKING) {
     const response = await fetch(`${API_BASE}/api/conversations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ mode }),
     });
     if (!response.ok) {
       throw new Error('Failed to create conversation');
@@ -33,9 +32,6 @@ export const api = {
     return response.json();
   },
 
-  /**
-   * Get a specific conversation.
-   */
   async getConversation(conversationId) {
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}`
@@ -46,10 +42,12 @@ export const api = {
     return response.json();
   },
 
-  /**
-   * Send a message in a conversation.
-   */
-  async sendMessage(conversationId, content) {
+  async sendMessage(conversationId, content, mode = COUNCIL_MODES.THINKING, userProfile = null) {
+    const body = { content, mode };
+    if (mode === COUNCIL_MODES.WINGMAN && userProfile) {
+      body.user_profile = userProfile;
+    }
+    
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message`,
       {
@@ -57,7 +55,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       }
     );
     if (!response.ok) {
@@ -66,14 +64,12 @@ export const api = {
     return response.json();
   },
 
-  /**
-   * Send a message and receive streaming updates.
-   * @param {string} conversationId - The conversation ID
-   * @param {string} content - The message content
-   * @param {function} onEvent - Callback function for each event: (eventType, data) => void
-   * @returns {Promise<void>}
-   */
-  async sendMessageStream(conversationId, content, onEvent) {
+  async sendMessageStream(conversationId, content, mode = COUNCIL_MODES.THINKING, userProfile = null, onEvent) {
+    const body = { content, mode };
+    if (mode === COUNCIL_MODES.WINGMAN && userProfile) {
+      body.user_profile = userProfile;
+    }
+
     const response = await fetch(
       `${API_BASE}/api/conversations/${conversationId}/message/stream`,
       {
@@ -81,7 +77,7 @@ export const api = {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify(body),
       }
     );
 

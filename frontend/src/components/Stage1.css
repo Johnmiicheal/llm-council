@@ -1,16 +1,18 @@
 .stage {
-  margin: 24px 0;
-  padding: 20px;
-  background: #0d0d0d;
-  border-radius: 12px;
-  border: 1px solid #2a2a2a;
+  margin: 0;
+  padding: 16px 0 0 0;
+  background: transparent;
+  border-radius: 0;
+  border: none;
 }
 
 .stage-title {
-  margin: 0 0 16px 0;
-  color: #ffffff;
-  font-size: 16px;
+  margin: 0 0 12px 0;
+  color: #808080;
+  font-size: 13px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .tabs {
@@ -61,4 +63,43 @@
 .response-text {
   color: #e5e5e5;
   line-height: 1.6;
+}
+
+.wingman-stage .tab.active {
+  border-color: #ff6b8a;
+}
+
+.wingman-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.suggestion-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #0d0d0d;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+}
+
+.suggestion-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  background: #ff6b8a;
+  color: #0d0d0d;
+  font-weight: 600;
+  font-size: 12px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.suggestion-text {
+  color: #e5e5e5;
+  line-height: 1.5;
+  font-size: 14px;
 }
